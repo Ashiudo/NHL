@@ -1,8 +1,7 @@
+# -*- coding: utf-8 -*-
 ###
-# Copyright (c) 2013, spline
+# Copyright (c) 2013, spline, Ashiudo
 # All rights reserved.
-#
-#
 ###
 
 import supybot.utils as utils
@@ -28,4 +27,4 @@ class NHL(callbacks.Plugin):
 Class = NHL
 
 
-# vim:set shiftwidth=4 softtabstop=4 expandtab textwidth=79:
+# vim:set shiftwidth=4 softtabstop=4 expandtab textwidth=250:

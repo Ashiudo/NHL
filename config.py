@@ -1,8 +1,6 @@
 ###
-# Copyright (c) 2013, spline
+# Copyright (c) 2013, spline, Ashiudo
 # All rights reserved.
-#
-#
 ###
 
 import supybot.conf as conf
@@ -21,9 +19,6 @@ def configure(advanced):
 
 
 NHL = conf.registerPlugin('NHL')
-# This is where your configuration variables (if any) should go.  For example:
-# conf.registerGlobalValue(NHL, 'someConfigVariableName',
-#     registry.Boolean(False, _("""Help for someConfigVariableName.""")))
 
 
-# vim:set shiftwidth=4 tabstop=4 expandtab textwidth=79:
+# vim:set shiftwidth=4 tabstop=4 expandtab textwidth=250:

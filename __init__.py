@@ -1,8 +1,6 @@
 ###
-# Copyright (c) 2013, spline
+# Copyright (c) 2013, spline, Ashiudo
 # All rights reserved.
-#
-#
 ###
 
 """
@@ -29,6 +27,7 @@ __url__ = '' # 'http://supybot.com/Members/yourname/NHL/download'
 
 import config
 import plugin
+reload(config)
 reload(plugin) # In case we're being reloaded.
 # Add more reloads here if you add third-party modules and want them to be
 # reloaded when this plugin is reloaded.  Don't forget to import them as well!
