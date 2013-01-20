@@ -19,6 +19,7 @@ class NHL(callbacks.Plugin):
     This should describe *how* to use this plugin."""
     threaded = True
 
+    # http://pastebin.com/Ev0VcDQ3
 	# http://www.nhl.com/ice/page.htm?id=80955
 # roster
 # http://sports.yahoo.com/nhl/players?type=lastname&query=A
