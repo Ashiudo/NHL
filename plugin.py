@@ -120,6 +120,39 @@ class NHL(callbacks.Plugin):
     ####################
     # PUBLIC FUNCTIONS #
     ####################
+
+    def nhlteams(self, irc, msg, args, optconf, optdiv):
+        """<conf> <div>
+        Display a list of NHL teams for input. Optional: use Eastern or Western for conference.
+        Optionally, it can also display specific divisions with each conf. Ex: Eastern Northeast
+        """
+        
+        validconfdiv = {'Eastern':('Atlantic','Northeast','Southeast'),
+                        'Western':('Central','Northwest','Pacific')
+                       }
+        
+        if optconf and not optdiv:
+            optconf = optconf.title()
+            if optconf not in validconfdiv:
+                irc.reply("ERROR: Conference must be one of: {0}".format(validconfdiv.keys()))
+                return
+            else:
+                teams = self._validteams(conf=optconf)
+        elif optconf and optdiv:
+            optconf,optdiv = optconf.title(),optdiv.title()
+            if optconf not in validconfdiv:
+                irc.reply("ERROR: Conference must be one of: {0}".format(validconfdiv.keys()))
+                return
+            if optdiv not in validconfdiv[optconf]:
+                irc.reply('ERROR: Division in {0} must be one of: {1}'.format(optconf, validconfdiv[optconf]))
+                return
+            teams = self._validteams(conf=optconf, div=optdiv)
+        else:
+            teams = self._validteams()
+                
+        irc.reply("Valid teams are: %s" % (string.join([ircutils.bold(item) for item in teams], " | ")))
+        
+    nhlteams = wrap(nhlteams, [optional('somethingWithoutSpaces'), optional('somethingWithoutSpaces')])
     
     def nhldailyleaders(self, irc, msg, args, optposition):
         """
