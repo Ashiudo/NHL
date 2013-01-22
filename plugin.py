@@ -27,7 +27,7 @@ class NHL(callbacks.Plugin):
     """Add the help for "@plugin help NHL" here
     This should describe *how* to use this plugin."""
     threaded = True
-    
+
     def __init__(self, irc):
         self.__parent = super(NHL, self)
         self.__parent.__init__(irc)
@@ -39,8 +39,8 @@ class NHL(callbacks.Plugin):
 
     def _validteams(self, conf=None, div=None):
         """Returns a list of valid teams for input verification."""
-        
-        db_filename = self.dbLocation          
+
+        db_filename = self.dbLocation
         conn = sqlite3.connect(db_filename)
         cursor = conn.cursor()
         if conf and not div:
@@ -54,10 +54,10 @@ class NHL(callbacks.Plugin):
             teamlist.append(str(row[0]))
         cursor.close()
         return teamlist
-        
+
     def _translateTeam(self, db, column, optteam):
         """Returns a list of valid teams for input verification."""
-        
+
         db_filename = self.dbLocation
         conn = sqlite3.connect(db_filename)
         cursor = conn.cursor()
@@ -69,7 +69,7 @@ class NHL(callbacks.Plugin):
 
     ######################
     # INTERNAL FUNCTIONS #
-    ######################    
+    ######################
 
     def _batch(self, iterable, size):
         """http://code.activestate.com/recipes/303279/#c7"""
@@ -115,7 +115,7 @@ class NHL(callbacks.Plugin):
             return html
         except Exception, e:
             self.log.error("ERROR fetching: {0} message: {1}".format(url, e))
-            return None            
+            return None
 
     ####################
     # PUBLIC FUNCTIONS #
@@ -126,11 +126,11 @@ class NHL(callbacks.Plugin):
         Display a list of NHL teams for input. Optional: use Eastern or Western for conference.
         Optionally, it can also display specific divisions with each conf. Ex: Eastern Northeast
         """
-        
+
         validconfdiv = {'Eastern':('Atlantic','Northeast','Southeast'),
                         'Western':('Central','Northwest','Pacific')
                        }
-        
+
         if optconf and not optdiv:
             optconf = optconf.title()
             if optconf not in validconfdiv:
@@ -149,30 +149,30 @@ class NHL(callbacks.Plugin):
             teams = self._validteams(conf=optconf, div=optdiv)
         else:
             teams = self._validteams()
-                
+
         irc.reply("Valid teams are: %s" % (string.join([ircutils.bold(item) for item in teams], " | ")))
-        
+
     nhlteams = wrap(nhlteams, [optional('somethingWithoutSpaces'), optional('somethingWithoutSpaces')])
-    
+
     def nhldailyleaders(self, irc, msg, args, optposition):
         """
         Display NHL daily leaders.
         """
-        
+
         url = self._b64decode('aHR0cDovL2VzcG4uZ28uY29tL25obC9zdGF0cy9kYWlseWxlYWRlcnM=')
-        
+
         html = self._fetch(url)
         if not html:
             irc.reply("Something broke fetching dailyleaders.")
             return
-            
+
         soup = BeautifulSoup(html)
         if not soup.find('table', attrs={'class':'tablehead', 'cellpadding':'3', 'cellspacing':'1'}):
             irc.reply("Something broke on formatting. Contact an owner.")
             return
-            
+
         header = soup.find('h1', attrs={'class':'h2'}).getText()
-        table = soup.find('table', attrs={'class':'tablehead', 'cellpadding':'3', 'cellspacing':'1'}) 
+        table = soup.find('table', attrs={'class':'tablehead', 'cellpadding':'3', 'cellspacing':'1'})
         title = table.find('tr', attrs={'class':'stathead'}).getText()
         rows = table.findAll('tr', attrs={'class':re.compile('^(odd|even)row.*?$')})
 
@@ -194,8 +194,78 @@ class NHL(callbacks.Plugin):
         irc.reply("{0} :: {1}".format(self._red(header), title))
         for each in output[0:5]:
             irc.reply(each)
-    
+
     nhldailyleaders = wrap(nhldailyleaders, [optional('somethingWithoutSpaces')])
+
+    def nhlleaders(self, irc, msg, args, optcategory):
+        """[category]
+        Display NHL stat leaders for the current season.
+        """
+
+        ereply = "Valid categories: \x035P\x03oints \x035G\x03oals \x035A\x03ssists " \
+                 + "\x035+\x03/- \x035GAA\x03 \x035SV\x03% \x035W\x03ins \x035Sh\x03utouts"
+
+        if not optcategory:
+            irc.reply(ereply)
+            return
+
+        statcats = {
+            'p($|ts|oint)':'points', 'g($|oal)':'goals',
+            'a($|ssist)':'assists', 'plus|\+':'plusMins',
+            'ga+$':'gaa', 's[av]($|\%|ve)':'savePct',
+            'w($|in)':'wins', 's[oh]':'shutouts'
+        }
+
+        optcategory = optcategory.lower()
+        cat = None
+        for r in statcats.iterkeys():
+            reg = re.compile(r)
+            m = reg.match(optcategory)
+            if m:
+                cat = statcats[r]
+                exit
+
+        if not cat:
+            irc.reply(ereply)
+            return
+
+
+        url = self._b64decode('aHR0cDovL2xpdmUubmhsZS5jb20vR2FtZURhdGEvU3RhdHNMZWFkZXJzLmpzb24=')
+        html = self._fetch(url)
+        if not html:
+            irc.reply('ERROR: Something broke fetching leaders.')
+            return
+
+        js = json.loads(html)
+        if cat in js['goaltending']:
+            ld = js['goaltending'][cat]
+        elif cat in js['offense']:
+            ld = js['offense'][cat]
+        else:
+            irc.reply('ERROR: json has changed')
+            return
+
+        maxlen = 1
+        abrevname = re.compile('(.)[^ ]* (.*)')
+        for p in ld:
+            m = abrevname.match(p['name'])
+            p['name'] = m.group(1) + ". " + m.group(2)
+            if len(p['name']) >= maxlen:
+                maxlen = len(p['name']) + 1
+
+        stack = ['NHL Top 5 ' + cat]
+        i = 1
+        try:
+            for p in ld:
+                stack.append(str(i) + ". " + p['name'] + " " * ( maxlen - len(p['name']) ) + "[" + p['team'] + "] " + p['stat'])
+                i+=1
+        except Exception:
+            stack = ['ERROR: json incomplete']
+
+        for each in stack:
+            irc.reply(each)
+
+    nhlleaders = wrap(nhlleaders, [optional('somethingWithoutSpaces')])
 
 #http://www.nhl.com/ice/app?service=page&page=CFStandingsJS&format=full
 # http://nlced.cdnak.neulion.com/nhl/config/ced_config.xml
@@ -205,7 +275,7 @@ Class = NHL
 # http://www.nhl.com/ice/page.htm?id=80955
 # roster
 # http://sports.yahoo.com/nhl/players?type=lastname&query=A
-# http://www.timeonice.com, http://www.behindthenet.ca, http://www.hockeyanalysis.com, and http://www.hockeyanalytics.com, and attempts to improve the user experience with a GWT interface. 
+# http://www.timeonice.com, http://www.behindthenet.ca, http://www.hockeyanalysis.com, and http://www.hockeyanalytics.com, and attempts to improve the user experience with a GWT interface.
 
 
 # vim:set shiftwidth=4 softtabstop=4 expandtab textwidth=250:
