@@ -21,5 +21,5 @@ def configure(advanced):
 
 NHL = conf.registerPlugin('NHL')
 conf.registerGlobalValue(NHL, 'dbLocation', registry.String(os.path.abspath(os.path.dirname(__file__))+'/db/nhl.db',"""Absolute path for nhl.db sqlite3 database file location."""))
-
+conf.registerGlobalValue(NHL, 'useGzip', registry.Boolean(False, """Request html to be gzipped before downloaded"""))
 # vim:set shiftwidth=4 tabstop=4 expandtab textwidth=250:

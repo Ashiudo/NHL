@@ -11,6 +11,9 @@ import datetime
 import time
 import sqlite3
 import os
+import gzip
+import StringIO
+import json
 from itertools import groupby, izip, count
 
 import supybot.utils as utils
@@ -110,8 +113,20 @@ class NHL(callbacks.Plugin):
         """HTML Fetch."""
         try:
             req = urllib2.Request(url)
-            req.add_header("User-Agent","Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:17.0) Gecko/17.0 Firefox/17.0")
-            html = (urllib2.urlopen(req)).read()
+            if not self.registryValue('useGzip'):
+                req.add_header("User-Agent","Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:17.0) Gecko/17.0 Firefox/17.0")
+                html = (urllib2.urlopen(req)).read()
+            else:
+                req.add_header("User-Agent","Mozilla/5.0 (gzip; X11; Ubuntu; Linux x86_64; rv:17.0) Gecko/17.0 Firefox/17.0")
+                req.add_header("Accept-Encoding","gzip")
+                zhtml = urllib2.urlopen(req)
+                zIO = StringIO.StringIO(zhtml.read())
+                zFile = gzip.GzipFile(fileobj=zIO)
+                try:
+                    html = zFile.read()
+                except IOError: #data was not gzipped
+                    html = zhtml.read()
+
             return html
         except Exception, e:
             self.log.error("ERROR fetching: {0} message: {1}".format(url, e))
