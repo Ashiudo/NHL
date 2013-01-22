@@ -3,6 +3,7 @@
 # All rights reserved.
 ###
 
+import os
 import supybot.conf as conf
 import supybot.registry as registry
 from supybot.i18n import PluginInternationalization, internationalizeDocstring
@@ -19,6 +20,6 @@ def configure(advanced):
 
 
 NHL = conf.registerPlugin('NHL')
-
+conf.registerGlobalValue(NHL, 'dbLocation', registry.String(os.path.abspath(os.path.dirname(__file__))+'/db/nhl.db',"""Absolute path for nhl.db sqlite3 database file location."""))
 
 # vim:set shiftwidth=4 tabstop=4 expandtab textwidth=250:

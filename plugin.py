@@ -27,6 +27,49 @@ class NHL(callbacks.Plugin):
     """Add the help for "@plugin help NHL" here
     This should describe *how* to use this plugin."""
     threaded = True
+    
+    def __init__(self, irc):
+        self.__parent = super(NHL, self)
+        self.__parent.__init__(irc)
+        self.dbLocation = self.registryValue('dbLocation')
+
+    ######################
+    # DATABASE FUNCTIONS #
+    ######################
+
+    def _validteams(self, conf=None, div=None):
+        """Returns a list of valid teams for input verification."""
+        
+        db_filename = self.dbLocation          
+        conn = sqlite3.connect(db_filename)
+        cursor = conn.cursor()
+        if conf and not div:
+            cursor.execute("select team from nhl where conf=?", (conf,))
+        elif conf and div:
+            cursor.execute("select team from nhl where conf=? AND div=?", (conf,div,))
+        else:
+            cursor.execute("select team from nhl")
+        teamlist = []
+        for row in cursor.fetchall():
+            teamlist.append(str(row[0]))
+        cursor.close()
+        return teamlist
+        
+    def _translateTeam(self, db, column, optteam):
+        """Returns a list of valid teams for input verification."""
+        
+        db_filename = self.dbLocation
+        conn = sqlite3.connect(db_filename)
+        cursor = conn.cursor()
+        query = "select %s from nfl where %s='%s'" % (db, column, optteam)
+        cursor.execute(query)
+        row = cursor.fetchone()
+        cursor.close()
+        return (str(row[0]))
+
+    ######################
+    # INTERNAL FUNCTIONS #
+    ######################    
 
     def _batch(self, iterable, size):
         """http://code.activestate.com/recipes/303279/#c7"""
@@ -121,6 +164,8 @@ class NHL(callbacks.Plugin):
     
     nhldailyleaders = wrap(nhldailyleaders, [optional('somethingWithoutSpaces')])
 
+#http://www.nhl.com/ice/app?service=page&page=CFStandingsJS&format=full
+# http://nlced.cdnak.neulion.com/nhl/config/ced_config.xml
 Class = NHL
 
 # http://pastebin.com/Ev0VcDQ3
