@@ -26,19 +26,24 @@ from supybot.i18n import PluginInternationalization, internationalizeDocstring
 _ = PluginInternationalization('NHL')
 
 @internationalizeDocstring
+
 class NHL(callbacks.Plugin):
     """Add the help for "@plugin help NHL" here
     This should describe *how* to use this plugin."""
-    threaded = True
+    threaded = False
 
     def __init__(self, irc):
-        self.__parent = super(NHL, self)
-        self.__parent.__init__(irc)
-        self.dbLocation = self.registryValue('dbLocation')
+        if __name__ != "__main__":
+            self.__parent = super(NHL, self)
+            self.__parent.__init__(irc)
+            self.dbLocation = self.registryValue('dbLocation')
 
     ######################
     # DATABASE FUNCTIONS #
     ######################
+
+    if __name__ == "__main__":
+        import supybot.log as log
 
     def _validteams(self, conf=None, div=None):
         """Returns a list of valid teams for input verification."""
@@ -113,19 +118,22 @@ class NHL(callbacks.Plugin):
         """HTML Fetch."""
         try:
             req = urllib2.Request(url)
-            if not self.registryValue('useGzip'):
-                req.add_header("User-Agent","Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:17.0) Gecko/17.0 Firefox/17.0")
-                html = (urllib2.urlopen(req)).read()
-            else:
-                req.add_header("User-Agent","Mozilla/5.0 (gzip; X11; Ubuntu; Linux x86_64; rv:17.0) Gecko/17.0 Firefox/17.0")
+            req.add_header("User-Agent","Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/56.0.2924.21 Safari/537.36")
+            if __name__ != "__main__" and self.registryValue('useGzip'):
                 req.add_header("Accept-Encoding","gzip")
                 zhtml = urllib2.urlopen(req)
-                zIO = StringIO.StringIO(zhtml.read())
-                zFile = gzip.GzipFile(fileobj=zIO)
-                try:
-                    html = zFile.read()
-                except IOError: #data was not gzipped
+                if zhtml.info().get('Content-Encoding') == 'gzip':
+                    try:
+                        zIO = StringIO(zhtml.read())
+                        zFile = gzip.GzipFile(fileobj=zIO)
+                        html = zFile.read()
+                    except Exception, e:
+                        html = zhtml.read()
+                else:
                     html = zhtml.read()
+            else:
+                print "fetching " + url
+                html = (urllib2.urlopen(req)).read()
 
             return html
         except Exception, e:
@@ -174,7 +182,7 @@ class NHL(callbacks.Plugin):
         Display NHL daily leaders.
         """
 
-        url = self._b64decode('aHR0cDovL2VzcG4uZ28uY29tL25obC9zdGF0cy9kYWlseWxlYWRlcnM=')
+        url = 'http://www.espn.com/nhl/stats/dailyleaders'
 
         html = self._fetch(url)
         if not html:
@@ -291,6 +299,20 @@ Class = NHL
 # roster
 # http://sports.yahoo.com/nhl/players?type=lastname&query=A
 # http://www.timeonice.com, http://www.behindthenet.ca, http://www.hockeyanalysis.com, and http://www.hockeyanalytics.com, and attempts to improve the user experience with a GWT interface.
+
+if __name__ == "__main__":
+
+    class fake_irc:
+        def reply(self, msg):
+            print msg
+
+    irc = fake_irc()
+    n = NHL(0)
+
+    #     n.function( irc, '', ['parameters'] )
+    print n.nhlleaders( irc, '', ['assists'] )
+
+    n.log.setLevel( 100 )  #dont need to hear from our fake supybot anymore
 
 
 # vim:set shiftwidth=4 softtabstop=4 expandtab textwidth=250:
