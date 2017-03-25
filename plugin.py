@@ -4,116 +4,39 @@
 # Copyright (c) 2013, spline, Ashiudo
 # All rights reserved.
 ###
-import urllib.request
-from bs4 import BeautifulSoup, NavigableString
-import re
-import string
-import datetime
-import time
-import sqlite3
-import os
-import gzip
-import json
-import io
-from itertools import groupby, count
 
 import supybot.utils as utils
 from supybot.commands import *
 import supybot.plugins as plugins
 import supybot.ircutils as ircutils
 import supybot.callbacks as callbacks
-from supybot.i18n import PluginInternationalization, internationalizeDocstring
+
+import urllib.request
+from bs4 import BeautifulSoup, NavigableString
+import re
+import gzip
+import json
+
+try:
+    from supybot.i18n import PluginInternationalization
+    _ = PluginInternationalization('NHL')
+except ImportError:
+    # Placeholder that allows to run the plugin on a bot
+    # without the i18n module
+    _ = lambda x: x
 
 _ = PluginInternationalization('NHL')
 
-@internationalizeDocstring
-
 class NHL(callbacks.Plugin):
-    """Add the help for "@plugin help NHL" here
-    This should describe *how* to use this plugin."""
-    threaded = True
+    """Get NHL scores and stats ETC."""
 
     def __init__(self, irc):
         if __name__ != "__main__":
             self.__parent = super(NHL, self)
             self.__parent.__init__(irc)
-            self.dbLocation = self.registryValue('dbLocation')
-
-    ######################
-    # DATABASE FUNCTIONS #
-    ######################
 
     if __name__ == "__main__":
         import supybot.log as log
-
-    def _validteams(self, conf=None, div=None):
-        """Returns a list of valid teams for input verification."""
-
-        db_filename = self.dbLocation
-        conn = sqlite3.connect(db_filename)
-        cursor = conn.cursor()
-        if conf and not div:
-            cursor.execute("select team from nhl where conf=?", (conf,))
-        elif conf and div:
-            cursor.execute("select team from nhl where conf=? AND div=?", (conf,div,))
-        else:
-            cursor.execute("select team from nhl")
-        teamlist = []
-        for row in cursor.fetchall():
-            teamlist.append(str(row[0]))
-        cursor.close()
-        return teamlist
-
-    def _translateTeam(self, db, column, optteam):
-        """Returns a list of valid teams for input verification."""
-
-        db_filename = self.dbLocation
-        conn = sqlite3.connect(db_filename)
-        cursor = conn.cursor()
-        query = "select %s from nfl where %s='%s'" % (db, column, optteam)
-        cursor.execute(query)
-        row = cursor.fetchone()
-        cursor.close()
-        return (str(row[0]))
-
-    ######################
-    # INTERNAL FUNCTIONS #
-    ######################
-
-    def _batch(self, iterable, size):
-        """http://code.activestate.com/recipes/303279/#c7"""
-        c = count()
-        for k, g in groupby(iterable, lambda x:c.next()//size):
-            yield g
-
-    def _b64decode(self, string):
-        """Returns base64 encoded string."""
-        import base64
-        return base64.b64decode(string)
-
-    def _red(self, string):
-        """Returns a red string."""
-        return ircutils.mircColor(string, 'red')
-
-    def _yellow(self, string):
-        """Returns a yellow string."""
-        return ircutils.mircColor(string, 'yellow')
-
-    def _green(self, string):
-        """Returns a green string."""
-        return ircutils.mircColor(string, 'green')
-
-    def _bold(self, string):
-        """Returns a bold string."""
-        return ircutils.bold(string)
-
-    def _ul(self, string):
-        """Returns an underline string."""
-        return ircutils.underline(string)
-
-    def _bu(self, string):
-        """Returns a bold/underline string."""
-        return ircutils.bold(ircutils.underline(string))
 
     def _fetch(self, url):
         """HTML Fetch."""
@@ -175,9 +98,10 @@ class NHL(callbacks.Plugin):
 
         irc.reply("Valid teams are: %s" % (string.join([ircutils.bold(item) for item in teams], " | ")))
 
-    nhlteams = wrap(nhlteams, [optional('somethingWithoutSpaces'), optional('somethingWithoutSpaces')])
+    if __name__ != "__main__":
+        nhlteams = wrap(nhlteams, [optional('somethingWithoutSpaces'), optional('somethingWithoutSpaces')])
 
-    def nhldailyleaders(self, irc, msg, args, optposition):
+    def nhldailyleaders(self, irc, msg, args):
         """
         Display NHL daily leaders.
         """
@@ -218,7 +142,8 @@ class NHL(callbacks.Plugin):
         for each in output[0:5]:
             irc.reply(each)
 
-    nhldailyleaders = wrap(nhldailyleaders, [optional('somethingWithoutSpaces')])
+    if __name__ != "__main__":
+        nhldailyleaders = wrap(nhldailyleaders, [optional('somethingWithoutSpaces')])
 
     def nhlleaders(self, irc, msg, args, optcategory):
         """[category]
@@ -242,7 +167,7 @@ class NHL(callbacks.Plugin):
         optcategory = optcategory.lower()
         cat = None
 
-        for r in statcats.keys():
+        for r in list(statcats.keys()):
             reg = re.compile(r)
             m = reg.match(optcategory)
             if m:
@@ -253,14 +178,13 @@ class NHL(callbacks.Plugin):
             irc.reply(ereply)
             return
 
-
         html = self._fetch('http://www.nhl.com/stats/leaders')
-        if not html:
+        try:
+            matches = re.search( r"LeaderData = (.*?\})\;.*?(\{.*?\})\;", html, re.S )
+            js = json.loads(matches.group(2 if cat in {'gaa', 'savePercentage', 'wins', 'shutout'} else 1))
+        except Exception:
             irc.reply('ERROR: Something broke fetching leaders.')
             return
-
-        matches = re.search( r"LeaderData = (.*?\})\;.*?(\{.*?\})\;", html, re.S )
-        js = json.loads(matches.group(2 if cat in {'gaa', 'savePercentage', 'wins', 'shutout'} else 1))
 
         maxlen = 1
         for p in js[cat][cat][0:5]:
@@ -280,12 +204,106 @@ class NHL(callbacks.Plugin):
         for each in stack:
             irc.reply(each)
 
-    nhlleaders = wrap(nhlleaders, [optional('somethingWithoutSpaces')])
+    if __name__ != "__main__":
+        nhlleaders = wrap(nhlleaders, [optional('somethingWithoutSpaces')])
+
+    def nhlstandings(self, irc, msg, args, p):
+        """<conf/div> [-p] [season]
+        Display NHL standings.
+        Optionally pass -p for wildcard
+        """
+
+        params = re.search( r"(atl|met|cen|pac|east|west)(?:\S*) *(wc|\-p|wild)? *(\d{4})?$", p.lower() )
+        if not params:
+            irc.reply('Valid categories: EAST WEST ATL CEN MET PAC [add -p for wildcard] [season]')
+            return
+
+        url = "http://statsapi.web.nhl.com/api/v1/standings?expand=standings.record,standings.team,standings.division,standings.conference,team.schedule.next,team.schedule.previous"
+        search, wildcard, season = params.group(1, 2, 3)
+        if season:
+            url += "&season=%s%d" % (season, int( season )+1)
+        if wildcard:
+            search = 'cen|pac' if re.search( 'west|cen|pac', search ) else 'atl|met'
+
+        try:
+            js = json.loads( self._fetch( url ) )
+        except Exception:
+            irc.reply('ERROR: Something broke fetching standings.')
+            return
+
+        tosort, output, ret = [[],[],[]]
+        divs = js['records']
+
+        for d in divs:
+            if re.search( search,  d['division']['name'] + d['conference']['name'], re.I ):
+                tosort.extend( d['teamRecords'] )
+
+        if re.search( 'east|west', search ):
+            output = sorted( tosort, key=lambda rank: int(rank['conferenceRank']) );
+            ret.append( output[0]['team']['conference']['name'].upper() )
+        else:
+            if wildcard:
+                div1 = list(filter(lambda x:tosort[0]['team']['division']['id'] == x['team']['division']['id'], tosort))
+                div2 = list(filter(lambda x:tosort[0]['team']['division']['id'] != x['team']['division']['id'], tosort))
+                div1.sort( key=lambda rank: int(rank['divisionRank']) )
+                div2.sort( key=lambda rank: int(rank['divisionRank']) )
+                output.extend( div1[0:3] )
+                output.extend( div2[0:3] )
+                div1.extend( div2[3:] )
+                div1.sort( key=lambda rank: int(rank['wildCardRank']) )
+                output.extend( div1[3:] )
+            else:
+                output = sorted( tosort, key=lambda rank: int(rank['divisionRank']) )
+            ret.append( output[0]['team']['division']['name'].upper() )
+
+        ret[0] = "%-17s GP   W   L  OT  \x02PTS\x02  ROW   GF   GA  DIFF     L10  STRK" % ret[0]
+        for o in output:
+            diff = o['goalsScored'] - o['goalsAgainst']
+            diffcolors = "\x03" + ( "4" if diff < 0 else "3" ) + " %4d\x03"
+            if o['team']['locationName'] == 'New York':
+                o['team']['locationName'] = "NY " + o['team']['teamName']
+
+            if wildcard:
+                rank = o['wildCardRank'] if o['wildCardRank'] != '0' else o['divisionRank']
+            else:
+                rank = o['divisionRank'] if len(output) < 10 else o['conferenceRank']
+
+            lastten = ""
+            for l in o['records']['overallRecords']:
+                if l['type'] == 'lastTen':
+                    lastten = "%d-%d-%d" % (l['wins'], l['losses'], l['ot'])
+
+            ret.append(
+                ("%2s %-14s %2d %3d %3d %3d \x02%4d\x02 %4d %4d %4d " + diffcolors + " %7s %5s") % (
+                rank,
+                ((o.get('clinchIndicator', "") + '-' ) if o.get('clinchIndicator', "") else "") + o['team']['locationName'],
+                o['gamesPlayed'],
+                o['leagueRecord']['wins'],
+                o['leagueRecord']['losses'],
+                o['leagueRecord']['ot'],
+                o['points'],
+                o['row'],
+                o['goalsScored'],
+                o['goalsAgainst'],
+                diff,
+                lastten,
+                o['streak']['streakCode']
+            ) )
+        if wildcard:
+            ret.insert( 4, "%-17s %s" % ( output[3]['team']['division']['name'].upper(), ret[0][18:] ) )
+            ret.insert( 8, "WILDCARD    " + ret[0][12:] )
+            ret[10] = "\x1F" + ret[10]
+
+        for each in ret:
+            irc.reply(each)
+
+    if __name__ != "__main__":
+        nhlstandings = wrap(nhlstandings, [optional('text')])
+
+Class = NHL
 
 #http://www.nhl.com/ice/app?service=page&page=CFStandingsJS&format=full
 # http://nlced.cdnak.neulion.com/nhl/config/ced_config.xml
-Class = NHL
-
 # http://pastebin.com/Ev0VcDQ3
 # http://www.nhl.com/ice/page.htm?id=80955
 # roster
@@ -294,6 +312,7 @@ Class = NHL
 
 if __name__ == "__main__":
 
+    import sys
     class fake_irc:
         def reply(self, msg):
             print( msg )
@@ -302,7 +321,7 @@ if __name__ == "__main__":
     n = NHL(0)
 
     #     n.function( irc, '', ['parameters'] )
-    print( n.nhldailyleaders( irc, '', ['sv'] ) )
+    print( n.nhlleaders( irc, '', [], ' '.join( sys.argv[1:] ) ) )
 
     n.log.setLevel( 100 )  #dont need to hear from our fake supybot anymore
 
