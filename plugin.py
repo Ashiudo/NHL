@@ -30,7 +30,7 @@ _ = PluginInternationalization('NHL')
 class NHL(callbacks.Plugin):
     """Add the help for "@plugin help NHL" here
     This should describe *how* to use this plugin."""
-    threaded = False
+    threaded = True
 
     def __init__(self, irc):
         if __name__ != "__main__":
@@ -231,16 +231,17 @@ class NHL(callbacks.Plugin):
         if not optcategory:
             irc.reply(ereply)
             return
-
+        #qw(points goals assists plusMinus gaa savePercentage wins shutout);
         statcats = {
             'p($|ts|oint)':'points', 'g($|oal)':'goals',
-            'a($|ssist)':'assists', 'plus|\+':'plusMins',
-            'ga+$':'gaa', 's[av]($|\%|ve)':'savePct',
-            'w($|in)':'wins', 's[oh]':'shutouts'
+            'a($|ssist)':'assists', 'plus|\+':'plusMinus',
+            'ga+$':'gaa', 's[av]($|\%|ve)':'savePercentage',
+            'w($|in)':'wins', 's[oh]':'shutout'
         }
 
         optcategory = optcategory.lower()
         cat = None
+        goalie = False
         for r in statcats.iterkeys():
             reg = re.compile(r)
             m = reg.match(optcategory)
@@ -253,34 +254,25 @@ class NHL(callbacks.Plugin):
             return
 
 
-        url = self._b64decode('aHR0cDovL2xpdmUubmhsZS5jb20vR2FtZURhdGEvU3RhdHNMZWFkZXJzLmpzb24=')
-        html = self._fetch(url)
+        html = self._fetch('http://www.nhl.com/stats/leaders')
         if not html:
             irc.reply('ERROR: Something broke fetching leaders.')
             return
 
-        js = json.loads(html)
-        if cat in js['goaltending']:
-            ld = js['goaltending'][cat]
-        elif cat in js['offense']:
-            ld = js['offense'][cat]
-        else:
-            irc.reply('ERROR: json has changed')
-            return
+        matches = re.search(r"LeaderData = (.*?\})\;.*?(\{.*?\})\;", html, re.S)
+        js = json.loads(matches.group(2 if cat in {'gaa', 'savePercentage', 'wins', 'shutout'} else 1))
 
         maxlen = 1
-        abrevname = re.compile('(.)[^ ]* (.*)')
-        for p in ld:
-            m = abrevname.match(p['name'])
-            p['name'] = m.group(1) + ". " + m.group(2)
-            if len(p['name']) >= maxlen:
-                maxlen = len(p['name']) + 1
+        for p in js[cat][cat][0:5]:
+            p['abvName'] = p['firstName'][0] + ". " + p['lastName']
+            if len(p['abvName']) > maxlen:
+                maxlen = len(p['abvName'])
 
         stack = ['NHL Top 5 ' + cat]
         i = 1
         try:
-            for p in ld:
-                stack.append(str(i) + ". " + p['name'] + " " * ( maxlen - len(p['name']) ) + "[" + p['team'] + "] " + p['stat'])
+            for p in js[cat][cat][0:5]:
+                stack.append(("%d. %-*s [%s] \x02%.3g") % (i, maxlen, p['abvName'], p['tricode'], p['value']))
                 i+=1
         except Exception:
             stack = ['ERROR: json incomplete']
@@ -310,7 +302,7 @@ if __name__ == "__main__":
     n = NHL(0)
 
     #     n.function( irc, '', ['parameters'] )
-    print n.nhlleaders( irc, '', ['assists'] )
+    print n.nhlleaders( irc, '', ['sv'] )
 
     n.log.setLevel( 100 )  #dont need to hear from our fake supybot anymore
 
