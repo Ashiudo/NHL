@@ -1,10 +1,11 @@
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 ###
 # Copyright (c) 2013, spline, Ashiudo
 # All rights reserved.
 ###
-import urllib2
-from BeautifulSoup import BeautifulSoup, NavigableString
+import urllib.request
+from bs4 import BeautifulSoup, NavigableString
 import re
 import string
 import datetime
@@ -12,9 +13,9 @@ import time
 import sqlite3
 import os
 import gzip
-import StringIO
 import json
-from itertools import groupby, izip, count
+import io
+from itertools import groupby, count
 
 import supybot.utils as utils
 from supybot.commands import *
@@ -117,26 +118,25 @@ class NHL(callbacks.Plugin):
     def _fetch(self, url):
         """HTML Fetch."""
         try:
-            req = urllib2.Request(url)
-            req.add_header("User-Agent","Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/56.0.2924.21 Safari/537.36")
-            if __name__ != "__main__" and self.registryValue('useGzip'):
-                req.add_header("Accept-Encoding","gzip")
-                zhtml = urllib2.urlopen(req)
+            req = urllib.request.Request(url)
+            req.add_header('User-Agent', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/56.0.2924.21 Safari/537.36')
+            if __name__ == "__main__" or self.registryValue('useGzip'):
+                print( "fetching " + url )
+                req.add_header('Accept-Encoding','gzip')
+                zhtml = urllib.request.urlopen(req)
                 if zhtml.info().get('Content-Encoding') == 'gzip':
                     try:
-                        zIO = StringIO(zhtml.read())
-                        zFile = gzip.GzipFile(fileobj=zIO)
+                        zFile = gzip.GzipFile(fileobj=zhtml)
                         html = zFile.read()
-                    except Exception, e:
+                    except Exception as e:
                         html = zhtml.read()
                 else:
                     html = zhtml.read()
             else:
-                print "fetching " + url
-                html = (urllib2.urlopen(req)).read()
+                html = (urllib.request.urlopen(req)).read()
 
-            return html
-        except Exception, e:
+            return html.decode('utf-8')
+        except Exception as e:
             self.log.error("ERROR fetching: {0} message: {1}".format(url, e))
             return None
 
@@ -189,7 +189,7 @@ class NHL(callbacks.Plugin):
             irc.reply("Something broke fetching dailyleaders.")
             return
 
-        soup = BeautifulSoup(html)
+        soup = BeautifulSoup(html, "lxml")
         if not soup.find('table', attrs={'class':'tablehead', 'cellpadding':'3', 'cellspacing':'1'}):
             irc.reply("Something broke on formatting. Contact an owner.")
             return
@@ -241,8 +241,8 @@ class NHL(callbacks.Plugin):
 
         optcategory = optcategory.lower()
         cat = None
-        goalie = False
-        for r in statcats.iterkeys():
+
+        for r in statcats.keys():
             reg = re.compile(r)
             m = reg.match(optcategory)
             if m:
@@ -259,7 +259,7 @@ class NHL(callbacks.Plugin):
             irc.reply('ERROR: Something broke fetching leaders.')
             return
 
-        matches = re.search(r"LeaderData = (.*?\})\;.*?(\{.*?\})\;", html, re.S)
+        matches = re.search( r"LeaderData = (.*?\})\;.*?(\{.*?\})\;", html, re.S )
         js = json.loads(matches.group(2 if cat in {'gaa', 'savePercentage', 'wins', 'shutout'} else 1))
 
         maxlen = 1
@@ -296,13 +296,13 @@ if __name__ == "__main__":
 
     class fake_irc:
         def reply(self, msg):
-            print msg
+            print( msg )
 
     irc = fake_irc()
     n = NHL(0)
 
     #     n.function( irc, '', ['parameters'] )
-    print n.nhlleaders( irc, '', ['sv'] )
+    print( n.nhldailyleaders( irc, '', ['sv'] ) )
 
     n.log.setLevel( 100 )  #dont need to hear from our fake supybot anymore
 
